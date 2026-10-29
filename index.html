@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICS Tidy</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['"Bricolage Grotesque"','ui-sans-serif','system-ui','sans-serif']}}}}</script>
+<style type="text/tailwindcss">
+@layer components{
+.card{@apply rounded-xl border border-slate-200 bg-white dark:border-slate-700/60 dark:bg-[#161c2e]}
+.btn{@apply inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700}
+.btn-p{@apply border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500 dark:border-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400}
+.btn-d{@apply border-rose-600 text-rose-700 hover:bg-rose-50 dark:border-rose-500 dark:bg-transparent dark:text-rose-300 dark:hover:bg-rose-950}
+.inp{@apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900}
+.cb{@apply h-4 w-4 shrink-0 accent-indigo-600}
+}
+</style>
+</head>
+<body class="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased dark:bg-[#0e1320] dark:text-slate-100">
+<header class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 pt-6">
+  <div>
+    <h1 class="text-2xl font-bold tracking-tight">ICS Tidy</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">Group, filter, edit and clean calendar files. Nothing leaves your computer.</p>
+  </div>
+  <button id="theme" class="btn" type="button">Light / dark</button>
+</header>
+
+<main class="mx-auto max-w-5xl space-y-4 px-4 py-6">
+  <label id="drop" class="card flex cursor-pointer flex-col items-center gap-2 border-2 border-dashed px-6 py-14 text-center transition-colors hover:border-indigo-500 focus-within:border-indigo-500">
+    <span class="text-lg font-medium">Drop an .ics file here</span>
+    <span class="text-sm text-slate-500 dark:text-slate-400">or <span class="font-medium text-indigo-600 underline dark:text-indigo-400">choose a file</span> from your computer</span>
+    <input id="file" type="file" accept=".ics,text/calendar" class="sr-only">
+  </label>
+
+  <div id="app" class="hidden space-y-4">
+    <section class="card flex flex-wrap items-start justify-between gap-3 p-4">
+      <div class="min-w-0">
+        <h2 id="fname" class="break-all font-bold"></h2>
+        <p id="sum" class="mt-1 text-sm text-slate-600 dark:text-slate-300"></p>
+      </div>
+      <button id="another" class="btn" type="button">Open another file</button>
+    </section>
+
+    <section class="card space-y-3 p-4">
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <input id="q" type="search" placeholder="Search title, location or description" class="inp sm:flex-1" aria-label="Search events">
+        <select id="mode" class="inp sm:w-56" aria-label="Grouping">
+          <option value="title">Group by exact title</option>
+          <option value="kw">Group by shared keyword</option>
+          <option value="flat">No grouping</option>
+        </select>
+      </div>
+      <div id="years" class="flex flex-wrap items-center gap-2"></div>
+    </section>
+
+    <section class="card sticky top-2 z-10 flex flex-wrap items-center gap-2 p-3 shadow-sm">
+      <label class="mr-auto flex items-center gap-2 text-sm font-medium"><input id="master" type="checkbox" class="cb"><span id="cnt"></span></label>
+      <button id="bEdit" class="btn" type="button">Edit selected</button>
+      <button id="bDel" class="btn btn-d" type="button">Delete selected</button>
+      <button id="bUndo" class="btn" type="button">Undo</button>
+      <button id="bOpen" class="btn" type="button">Expand all</button>
+      <button id="bExp" class="btn btn-p" type="button">Export cleaned .ics</button>
+    </section>
+
+    <div id="list" class="space-y-2"></div>
+  </div>
+</main>
+
+<dialog id="dlg" class="card w-[min(34rem,92vw)] p-5 text-inherit backdrop:bg-slate-950/60">
+  <h2 class="text-lg font-bold">Edit <span id="dn"></span> selected events</h2>
+  <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">Order of changes: rename, find and replace, then prefix and suffix.</p>
+  <div class="space-y-3 text-sm">
+    <label class="block">Rename every title to<input id="fName" class="inp mt-1" placeholder="Leave empty to keep titles"></label>
+    <div class="grid grid-cols-2 gap-3">
+      <label>Add prefix<input id="fPre" class="inp mt-1" placeholder="[OC1] "></label>
+      <label>Add suffix<input id="fSuf" class="inp mt-1"></label>
+      <label>Find in title<input id="fFind" class="inp mt-1"></label>
+      <label>Replace with<input id="fRep" class="inp mt-1"></label>
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      <label class="col-span-2">Categories (comma separated)<input id="fCat" class="inp mt-1" placeholder="Lectures, Year 1"></label>
+      <label>Categories mode<select id="fCm" class="inp mt-1"><option value="add">Add to existing</option><option value="set">Replace existing</option></select></label>
+    </div>
+    <p id="fPrev" class="break-words rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800"></p>
+  </div>
+  <div class="mt-5 flex justify-end gap-2">
+    <button id="fCancel" class="btn" type="button">Cancel</button>
+    <button id="fOk" class="btn btn-p" type="button">Apply changes</button>
+  </div>
+</dialog>
+<div id="toast" role="status" class="pointer-events-none fixed bottom-4 left-1/2 z-50 hidden -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"></div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s),MON='Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
+const E=s=>String(s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const nm=l=>l.split(/[;:]/,1)[0].toUpperCase();
+const val=l=>{let q=0;for(let i=0;i<l.length;i++){const c=l[i];if(c=='"')q^=1;else if(c==':'&&!q)return l.slice(i+1)}return''};
+const unesc=s=>s.replace(/\\([nN,;\\])/g,(m,c)=>c=='n'||c=='N'?'\n':c);
+const esc=s=>s.replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+const norm=s=>s.toLowerCase().replace(/\s+/g,' ').trim();
+const STOP=new Set('the and for with from this that your you our are was not has have into over per via'.split(' '));
+const toks=s=>(s.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(t=>!STOP.has(t)&&!/^\d+$/.test(t));
+const tm=s=>{const m=/T(\d\d)(\d\d)/.exec(s);return m?m[1]+':'+m[2]:''};
+const pd=s=>{const m=/^(\d{4})(\d\d)(\d\d)(?:T(\d\d)(\d\d)(\d\d)?)?(Z)?/.exec(s);if(!m)return null;const a=[+m[1],m[2]-1,+m[3],+m[4]||0,+m[5]||0,+m[6]||0];return m[7]?new Date(Date.UTC(...a)):new Date(...a)};
+
+let S={name:'',head:[],others:[],evs:[]},uid=0,sel=new Set,yrs=new Set,open=new Set,hist=[],G=[],F=[],q='',mode='title';
+
+/* ---------- parsing ---------- */
+function fill(e){
+  const m={};let d=0;
+  for(const l of e.lines){const n=nm(l);if(n=='BEGIN')d++;else if(n=='END')d--;else if(!d&&!(n in m))m[n]=l}
+  const g=k=>m[k]?unesc(val(m[k])):'';
+  e.raw=g('SUMMARY');e.sum=e.raw||'(no title)';e.loc=g('LOCATION');e.desc=g('DESCRIPTION');e.cat=g('CATEGORIES');
+  e.ds=m.DTSTART?val(m.DTSTART).trim():'';e.de=m.DTEND?val(m.DTEND).trim():'';
+  e.date=pd(e.ds);e.rec=!!m.RRULE;e.allDay=e.ds.length==8;
+  e.year=/^\d{4}/.test(e.ds)?e.ds.slice(0,4):'No date';
+  return e;
+}
+const mk=lines=>fill({id:++uid,lines});
+function parse(t){
+  const L=t.replace(/\r\n?/g,'\n').replace(/\n[ \t]/g,'').split('\n').filter(l=>l.trim()),head=[],others=[],evs=[];
+  let d=0,buf,kind;
+  for(const l of L){
+    const n=nm(l),v=val(l).trim().toUpperCase();
+    if(n=='BEGIN'){if(d==0){if(v=='VCALENDAR')d=1}else if(d==1){kind=v=='VEVENT';buf=[l];d=2}else{d++;buf.push(l)}}
+    else if(n=='END'){if(d==1)d=0;else if(d==2){buf.push(l);kind?evs.push(mk(buf.slice(1,-1))):others.push(...buf);d=1}else if(d>2){d--;buf.push(l)}}
+    else if(d==1)head.push(l);else if(d>1)buf.push(l);
+  }
+  if(!head.length&&!evs.length&&!others.length)throw new Error('This does not look like an iCalendar (.ics) file.');
+  return{head,others,evs};
+}
+function setP(e,k,v){
+  const L=e.lines.slice();let d=0,x=-1;
+  L.forEach((l,i)=>{const n=nm(l);if(n=='BEGIN')d++;else if(n=='END')d--;else if(!d&&n==k&&x<0)x=i});
+  if(x>=0){const l=L[x];L[x]=l.slice(0,l.length-val(l).length)+v}else L.push(k+':'+v);
+  return fill({id:e.id,lines:L});
+}
+
+/* ---------- export ---------- */
+const enc=new TextEncoder();
+function fold(l){let out='',line='',n=0;for(const ch of l){const b=enc.encode(ch).length;if(n+b>75){out+=line+'\r\n';line=' ';n=1}line+=ch;n+=b}return out+line}
+function build(){
+  const has=k=>S.head.some(l=>nm(l)==k),o=['BEGIN:VCALENDAR'];
+  if(!has('VERSION'))o.push('VERSION:2.0');
+  if(!has('PRODID'))o.push('PRODID:-//ICS Tidy//Browser Editor 1.0//EN');
+  o.push(...S.head,...S.others);
+  S.evs.forEach(e=>o.push('BEGIN:VEVENT',...e.lines,'END:VEVENT'));
+  o.push('END:VCALENDAR');
+  return o.map(fold).join('\r\n')+'\r\n';
+}
+
+/* ---------- filtering and grouping ---------- */
+function filt(){const t=q.trim().toLowerCase();return S.evs.filter(e=>(!yrs.size||yrs.has(e.year))&&(!t||(e.sum+'\n'+e.loc+'\n'+e.desc+'\n'+e.cat).toLowerCase().includes(t)))}
+function groups(F){
+  const M=new Map(),add=(k,l,e)=>{let g=M.get(k);if(!g)M.set(k,g={k,l,ev:[]});g.ev.push(e)};
+  if(mode=='flat')F.forEach(e=>add('all','All events',e));
+  else if(mode=='title')F.forEach(e=>add(norm(e.sum),e.sum,e));
+  else{
+    const fr=Object.create(null);
+    S.evs.forEach(e=>new Set(toks(e.sum)).forEach(t=>fr[t]=(fr[t]||0)+1));
+    F.forEach(e=>{const t=toks(e.sum).filter(t=>fr[t]>1).sort((a,b)=>fr[b]-fr[a]||b.length-a.length)[0];t?add(t,t[0].toUpperCase()+t.slice(1),e):add('\0','Other titles',e)});
+  }
+  return[...M.values()].sort((a,b)=>b.ev.length-a.ev.length||a.l.localeCompare(b.l));
+}
+
+/* ---------- rendering ---------- */
+function summary(){
+  const ds=S.evs.map(e=>e.date).filter(Boolean).sort((a,b)=>a-b),f=d=>d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+  const t=new Set(S.evs.map(e=>norm(e.sum))).size,y=new Set(S.evs.map(e=>e.year)).size,r=S.evs.filter(e=>e.rec).length;
+  $('#fname').textContent=S.name;
+  $('#sum').textContent=S.evs.length?`${S.evs.length} events from ${ds.length?f(ds[0])+' to '+f(ds[ds.length-1])+' ('+(Math.round((ds[ds.length-1]-ds[0])/864e5)+1)+' days)':'undated entries'}. ${t} unique titles, ${y} year${y>1?'s':''}, ${r} recurring.`:'No events left in this calendar.';
+}
+const row=e=>{
+  const ok=/^\d{8}/.test(e.ds),mo=ok?MON[+e.ds.slice(4,6)-1]:'',dy=ok?+e.ds.slice(6,8):'–';
+  const t=e.allDay?'All day':tm(e.ds)+(tm(e.de)?'–'+tm(e.de):'')+(e.ds.endsWith('Z')?' UTC':'');
+  return`<li class="flex items-center gap-3 border-t border-slate-100 px-4 py-2 dark:border-slate-700/50"><input type="checkbox" class="cb" data-e="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Select event"><div class="w-11 shrink-0 overflow-hidden rounded-md border border-slate-300 text-center dark:border-slate-600"><div class="bg-indigo-600 text-[10px] leading-4 text-white">${mo||'n/a'}</div><div class="text-sm font-bold leading-6">${dy}</div></div><div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">${E(e.sum)}${e.rec?' <span class="ml-1 rounded bg-slate-100 px-1.5 text-xs font-normal dark:bg-slate-700">repeats</span>':''}</p><p class="truncate text-xs text-slate-500 dark:text-slate-400">${E([ok?e.ds.slice(0,4):'',t,e.loc,e.cat].filter(Boolean).join(', '))}</p></div></li>`;
+};
+function render(){
+  F=filt().sort((a,b)=>(a.date||0)-(b.date||0));
+  const ids=new Set(F.map(e=>e.id));[...sel].forEach(i=>ids.has(i)||sel.delete(i));
+  G=groups(F);
+  const yc={};S.evs.forEach(e=>yc[e.year]=(yc[e.year]||0)+1);
+  $('#years').innerHTML='<span class="text-sm text-slate-500 dark:text-slate-400">Years</span>'+Object.keys(yc).sort().map(y=>{const on=yrs.has(y);return`<label class="flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${on?'border-indigo-500 bg-indigo-50 dark:bg-indigo-950':'border-slate-300 dark:border-slate-600'}"><input type="checkbox" class="cb" data-y="${y}" ${on?'checked':''}>${y}<span class="text-slate-500 dark:text-slate-400">${yc[y]}</span></label>`}).join('')+(yrs.size?'<button class="btn" data-clr type="button">Show all years</button>':'');
+  $('#list').innerHTML=G.length?G.map((g,i)=>{const o=mode=='flat'||open.has(g.k);return`<article class="card overflow-hidden"><div class="flex items-center gap-3 px-4 py-3"><input type="checkbox" class="cb" data-g="${i}" aria-label="Select all in ${E(g.l)}"><button type="button" data-t="${i}" aria-expanded="${o}" class="flex min-w-0 flex-1 items-center gap-2 text-left"><span class="inline-block w-4 text-slate-400 transition-transform ${o?'rotate-90':''}">▸</span><span class="truncate font-medium">${E(g.l)}</span><span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium dark:bg-slate-700">${g.ev.length}</span></button></div>${o?'<ul>'+g.ev.map(row).join('')+'</ul>':''}</article>`}).join(''):'<p class="card p-8 text-center text-slate-500 dark:text-slate-400">No events match the current filters.</p>';
+  document.querySelectorAll('[data-g]').forEach(c=>{const g=G[c.dataset.g],n=g.ev.filter(e=>sel.has(e.id)).length;c.checked=n>0&&n==g.ev.length;c.indeterminate=n>0&&n<g.ev.length});
+  const n=sel.size,m=$('#master');m.checked=F.length>0&&n==F.length;m.indeterminate=n>0&&n<F.length;
+  $('#cnt').textContent=`${n} selected of ${F.length} shown`;
+  $('#bEdit').disabled=$('#bDel').disabled=!n;$('#bUndo').disabled=!hist.length;
+  $('#bOpen').textContent=G.length&&G.every(g=>open.has(g.k))?'Collapse all':'Expand all';
+}
+
+/* ---------- interaction ---------- */
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(tt);tt=setTimeout(()=>t.classList.add('hidden'),3500)};
+const toggle=(ids,on)=>{ids.forEach(i=>on?sel.add(i):sel.delete(i));render()};
+function load(f){
+  if(!f)return;
+  f.text().then(t=>{
+    let p;try{p=parse(t)}catch(err){toast(err.message);return}
+    S={...p,name:f.name};sel.clear();yrs.clear();open.clear();hist=[];q='';$('#q').value='';
+    $('#drop').classList.add('hidden');$('#app').classList.remove('hidden');summary();render();
+  });
+}
+$('#file').onchange=e=>{load(e.target.files[0]);e.target.value=''};
+$('#another').onclick=()=>$('#file').click();
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});
+$('#list').onclick=e=>{const b=e.target.closest('[data-t]');if(b){const k=G[b.dataset.t].k;open.has(k)?open.delete(k):open.add(k);render()}};
+$('#list').onchange=e=>{const t=e.target;if(t.dataset.e)toggle([+t.dataset.e],t.checked);else if(t.dataset.g!=null)toggle(G[t.dataset.g].ev.map(x=>x.id),t.checked)};
+$('#master').onchange=e=>toggle(F.map(x=>x.id),e.target.checked);
+$('#years').onchange=e=>{const y=e.target.dataset.y;if(y){e.target.checked?yrs.add(y):yrs.delete(y);render()}};
+$('#years').onclick=e=>{if(e.target.dataset.clr!=null){yrs.clear();render()}};
+$('#q').oninput=e=>{q=e.target.value;render()};
+$('#mode').onchange=e=>{mode=e.target.value;open.clear();render()};
+$('#bOpen').onclick=()=>{const all=G.every(g=>open.has(g.k));G.forEach(g=>all?open.delete(g.k):open.add(g.k));render()};
+$('#bDel').onclick=()=>{const n=sel.size;if(!n)return;hist.push(S.evs);S.evs=S.evs.filter(e=>!sel.has(e.id));sel.clear();summary();render();toast(`Deleted ${n} event${n>1?'s':''}. Use Undo to bring them back.`)};
+$('#bUndo').onclick=()=>{if(hist.length){S.evs=hist.pop();summary();render();toast('Last change undone.')}};
+$('#bExp').onclick=()=>{
+  const u=URL.createObjectURL(new Blob([build()],{type:'text/calendar;charset=utf-8'})),a=document.createElement('a');
+  a.href=u;a.download=S.name.replace(/\.ics$/i,'')+'-cleaned.ics';document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),2e3);toast(`Exported ${S.evs.length} events.`);
+};
+
+/* ---------- bulk edit ---------- */
+const fv=id=>$('#'+id).value;
+const tr=t=>{const n=fv('fName');if(n)t=n;const f=fv('fFind');if(f)t=t.split(f).join(fv('fRep'));return fv('fPre')+t+fv('fSuf')};
+const prev=()=>{const e=S.evs.find(x=>sel.has(x.id));$('#fPrev').textContent=e?`Preview: "${e.raw}" becomes "${tr(e.raw)}"`:''};
+$('#bEdit').onclick=()=>{if(!sel.size)return;['fName','fPre','fSuf','fFind','fRep','fCat'].forEach(i=>$('#'+i).value='');$('#dn').textContent=sel.size;$('#dlg').showModal();prev()};
+$('#dlg').oninput=prev;
+$('#fCancel').onclick=()=>$('#dlg').close();
+$('#fOk').onclick=()=>{
+  const cats=fv('fCat').split(',').map(s=>s.trim()).filter(Boolean),add=fv('fCm')=='add',any=fv('fName')||fv('fFind')||fv('fPre')||fv('fSuf');
+  if(!any&&!cats.length){toast('Enter a change to apply first.');return}
+  hist.push(S.evs);const n=sel.size;
+  S.evs=S.evs.map(e=>{
+    if(!sel.has(e.id))return e;let r=e;
+    if(any)r=setP(r,'SUMMARY',esc(tr(e.raw)));
+    if(cats.length){const old=add&&r.cat?r.cat.split(',').map(s=>s.trim()):[];r=setP(r,'CATEGORIES',[...new Set([...old,...cats])].map(c=>esc(c)).join(','))}
+    return r;
+  });
+  $('#dlg').close();summary();render();toast(`Updated ${n} events.`);
+};
+
+/* ---------- theme ---------- */
+const root=document.documentElement;
+root.classList.toggle('dark',matchMedia('(prefers-color-scheme: dark)').matches);
+try{const s=localStorage.getItem('ics-theme');if(s)root.classList.toggle('dark',s=='dark')}catch(_){}
+$('#theme').onclick=()=>{const d=root.classList.toggle('dark');try{localStorage.setItem('ics-theme',d?'dark':'light')}catch(_){}};
+})();
+</script>
+</body>
+</html>
